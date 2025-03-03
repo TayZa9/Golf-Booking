@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book a Golf Course</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+    <!-- Navigation Bar -->
+    <div id="navbar-container"></div>
+    <script>
+        fetch("navbar.html")
+            .then(response => response.text())
+            .then(data => {
+                document.getElementById("navbar-container").innerHTML = data;
+            });
+    </script>
+
+    <!-- Recommendation Section -->
+    <div class="recommendation-container">
+        <h2 class="form-title">Recommended Courses for You</h2>
+        <div id="recommendations" class="course-container"></div>
+    </div>
+
+    <!-- Booking Form -->
+    <div class="booking-container">
+        <h2 class="form-title">Book a Golf Course</h2>
+        <form id="booking-form">
+            <input type="text" id="course-name" placeholder="Enter Course Name" required>
+            <input type="date" id="date" required>
+            <input type="time" id="time" required>
+            <input type="number" id="players" placeholder="Enter Number of Players" required>
+            <button type="submit">Book Now</button>
+        </form>
+    </div>
+
+    <p id="booking-message"></p>
+
+    <!-- 🔹 Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
+
+    <script>
+        // 🔹 Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCZK4UtQweYPqLysTuy9vAsXRlqvySK5Ow",
+            authDomain: "golfbooking-f8f28.firebaseapp.com",
+            databaseURL: "https://golfbooking-f8f28-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "golfbooking-f8f28",
+            storageBucket: "golfbooking-f8f28.firebasestorage.app",
+            messagingSenderId: "754510906037",
+            appId: "1:754510906037:web:16187e6fb33c235a45f4fc",
+            measurementId: "G-GXHZPWEXN1"
+        };
+
+        // 🔹 Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.database();
+
+        // 🔹 Booking Function
+        function createBooking(courseName, date, time, players) {
+            const userId = auth.currentUser ? auth.currentUser.uid : "Guest";
+            const bookingRef = db.ref("bookings").push();
+
+            return bookingRef.set({
+                userId: userId,
+                courseName: courseName,
+                date: date,
+                time: time,
+                players: players,
+                timestamp: new Date().toISOString()
+            });
+        }
+
+        // 🔹 Attach Booking Function to Form
+        document.getElementById("booking-form").addEventListener("submit", function(e) {
+            e.preventDefault();
+            const courseName = document.getElementById("course-name").value;
+            const date = document.getElementById("date").value;
+            const time = document.getElementById("time").value;
+            const players = document.getElementById("players").value;
+
+            createBooking(courseName, date, time, players)
+                .then(() => {
+                    document.getElementById("booking-message").innerText = "Booking confirmed!";
+                })
+                .catch(() => {
+                    document.getElementById("booking-message").innerText = "Booking failed. Please try again.";
+                });
+        });
+
+        // 🔹 Fetch Recommendations
+        function fetchRecommendations(userId) {
+            const userBookingsRef = db.ref("bookings");
+
+            userBookingsRef.orderByChild("userId").equalTo(userId).once("value", (snapshot) => {
+                const bookingData = snapshot.val();
+                const courseCounts = {};
+
+                if (bookingData) {
+                    Object.values(bookingData).forEach(booking => {
+                        const courseName = booking.courseName;
+                        courseCounts[courseName] = (courseCounts[courseName] || 0) + 1;
+                    });
+
+                    // Sort courses by most booked
+                    const sortedCourses = Object.entries(courseCounts).sort((a, b) => b[1] - a[1]);
+
+                    // Display recommendations
+                    const recommendationsList = document.getElementById("recommendations");
+                    recommendationsList.innerHTML = sortedCourses.length
+                        ? sortedCourses.map(([course, count]) => `<p>${course} (Booked ${count} times)</p>`).join("")
+                        : "<p>No recommendations available</p>";
+                }
+            });
+        }
+
+        // Fetch recommendations when user logs in
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                fetchRecommendations(user.uid);
+            }
+        });
+    </script>
+
+    <!-- 🔹 Styles -->
+    <style>
+        /* Background Styling */
+        body {
+            background: url('../assets/golf-background.png') no-repeat center center/cover;
+            font-family: Arial, sans-serif;
+            color: white;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Box Styling for Recommendations & Booking */
+        .recommendation-container, .booking-container {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            padding: 20px;
+            max-width: 400px;
+            margin: 20px auto;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+            animation: fadeIn 1.5s ease-in-out;
+            color: black;
+        }
+
+        /* Form Title */
+        .form-title {
+            font-size: 22px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: white;
+        }
+
+        /* Input Fields */
+        input {
+            width: 90%;
+            padding: 12px;
+            margin: 8px 0;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            background: rgba(255, 255, 255, 0.8);
+            color: black;
+        }
+
+        /* Book Now Button */
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #007BFF;
+            border: none;
+            border-radius: 5px;
+            font-size: 18px;
+            color: white;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        /* Fade-in Animation */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+
+</body>
+</html>
